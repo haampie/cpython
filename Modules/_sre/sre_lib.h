@@ -12,6 +12,25 @@
 
 /* This file is included three times, with different character settings */
 
+/* Include stringlib fastsearch for prefix scanning. */
+#define FASTSEARCH SRE(fastsearch)
+#define STRINGLIB(F) SRE(slib_##F)
+#define STRINGLIB_CHAR SRE_CHAR
+#define STRINGLIB_SIZEOF_CHAR SIZEOF_SRE_CHAR
+#if SIZEOF_SRE_CHAR == 1
+#define STRINGLIB_FAST_MEMCHR memchr
+#endif
+#include "stringlib/fastsearch.h"
+#undef FASTSEARCH
+#undef STRINGLIB
+#undef STRINGLIB_CHAR
+#undef STRINGLIB_SIZEOF_CHAR
+#undef STRINGLIB_FAST_MEMCHR
+#undef STRINGLIB_BLOOM_ADD
+#undef STRINGLIB_BLOOM
+#undef STRINGLIB_BLOOM_WIDTH
+#undef STRINGLIB_FASTSEARCH_H
+
 LOCAL(int)
 SRE(at)(SRE_STATE* state, const SRE_CHAR* ptr, SRE_CODE at)
 {
@@ -1753,10 +1772,10 @@ SRE(search)(SRE_STATE* state, SRE_CODE* pattern)
         end = (SRE_CHAR *)state->end;
         state->must_advance = 0;
         while (ptr < end) {
-            while (*ptr != c) {
-                if (++ptr >= end)
-                    return 0;
-            }
+            Py_ssize_t offset = SRE(slib_find_char)(ptr, end - ptr, c);
+            if (offset < 0)
+                return 0;
+            ptr += offset;
             TRACE(("|%p|%p|SEARCH LITERAL\n", pattern, ptr));
             state->start = ptr;
             state->ptr = ptr + prefix_skip;
@@ -1786,10 +1805,12 @@ SRE(search)(SRE_STATE* state, SRE_CODE* pattern)
 #endif
         while (ptr < end) {
             SRE_CHAR c = (SRE_CHAR) prefix[0];
-            while (*ptr++ != c) {
-                if (ptr >= end)
-                    return 0;
-            }
+            Py_ssize_t offset = SRE(slib_find_char)(ptr, end - ptr, c);
+            if (offset < 0)
+                return 0;
+
+            /* advance pointer past the matched first character */
+            ptr += offset + 1;
             if (ptr >= end)
                 return 0;
 
@@ -1869,6 +1890,9 @@ SRE(search)(SRE_STATE* state, SRE_CODE* pattern)
 #undef SRE_CHAR
 #undef SIZEOF_SRE_CHAR
 #undef SRE
+#undef FAST_COUNT
+#undef FAST_SEARCH
+#undef FAST_RSEARCH
 
 /* vim:ts=4:sw=4:et
 */
