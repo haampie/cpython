@@ -1877,6 +1877,16 @@ SRE(search)(SRE_STATE* state, SRE_CODE* pattern)
         }
         while (status == 0 && ptr < end) {
             ptr++;
+            if (pattern[0] == SRE_OP_AT &&
+                pattern[1] == SRE_AT_BEGINNING_LINE &&
+                !SRE_IS_LINEBREAK((int) ptr[-1]))
+            {
+                Py_ssize_t offset = SRE(slib_find_char)(ptr, end - ptr, '\n');
+                if (offset < 0) {
+                    break;
+                }
+                ptr += offset + 1; /* advance past the newline */
+            }
             RESET_CAPTURE_GROUP();
             TRACE(("|%p|%p|SEARCH\n", pattern, ptr));
             state->start = state->ptr = ptr;
